@@ -1,10 +1,126 @@
 <body>
-  <h1>it works!</h1>
+  <canvas id="c"></canvas>
   <style>
-    body { background: black; color: white; font-family: sans-serif; }
+    body { margin: 0; overflow: hidden; background: black; cursor: crosshair; }
   </style>
   <script>
-    const title = document.querySelector("h1");
-    title.onclick = () => (title.textContent = "you clicked it");
+    const ctx = c.getContext("2d");
+    let W, H, audio;
+    let rockets = [];
+    let sparks = [];
+    let yaw = 0, pitch = 0.3;  
+    let down = 0, moved = 0;    
+
+    onresize = () => {
+      W = c.width = innerWidth;
+      H = c.height = innerHeight;
+    };
+    onresize();
+
+    function tone(type, a, b, dur, vol) {
+      audio ||= new AudioContext();
+      const o = audio.createOscillator();
+      const g = audio.createGain();
+      const t = audio.currentTime;
+      o.type = type;
+      o.frequency.setValueAtTime(a, t);
+      o.frequency.exponentialRampToValueAtTime(b, t + dur);
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g).connect(audio.destination);
+      o.start(t);
+      o.stop(t + dur);
+    }
+
+    onpointerdown = () => {
+      audio ||= new AudioContext();
+      down = 1;
+      moved = 0;
+    };
+    onpointermove = e => {
+      if (down) {
+        yaw += e.movementX * 0.005;
+        pitch += e.movementY * 0.005;
+        moved += Math.abs(e.movementX) + Math.abs(e.movementY);
+      }
+    };
+    onpointerup = e => {
+      down = 0;
+      if (moved < 5) {
+        rockets.push({ x: e.clientX, y: H, targetY: e.clientY });
+        tone("sawtooth", 300, 1200, 0.9, 0.03); 
+      }
+    };
+
+    function explode(cx, cy) {
+      const hue = Math.random() * 360;
+      for (let i = 0; i < 120; i++) {
+        // random direction on a sphere
+        const z = Math.random() * 2 - 1;
+        const a = Math.random() * 6.28;
+        const r = Math.sqrt(1 - z * z);
+        const speed = 3.5 + Math.random() * 1.5;
+        sparks.push({
+          cx, cy,                    
+          x: 0, y: 0, z: 0,          
+          vx: r * Math.cos(a) * speed,
+          vy: r * Math.sin(a) * speed,
+          vz: z * speed,
+          life: 1,
+          hue: hue + Math.random() * 40,
+        });
+      }
+      tone("sine", 140, 30, 0.6, 0.5); // boom
+    }
+
+    function frame() {
+      yaw += 0.004;
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      const cp = Math.cos(pitch), sp = Math.sin(pitch);
+
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "rgba(0,0,0,.2)";
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = "lighter";
+
+      if (!audio) {
+        ctx.fillStyle = "white";
+        ctx.fillText("click to launch, drag to spin", 20, 30);
+      }
+
+      rockets = rockets.filter(r => {
+        r.y += (r.targetY - r.y) * 0.07;
+        ctx.fillStyle = "orange";
+        ctx.fillRect(r.x, r.y, 3, 8);
+        if (r.y - r.targetY < 8) {
+          explode(r.x, r.y);
+          return false;
+        }
+        return true;
+      });
+
+      sparks = sparks.filter(s => {
+        
+        s.vy += 0.05;
+        s.vx *= 0.98; s.vy *= 0.98; s.vz *= 0.98;
+        s.x += s.vx; s.y += s.vy; s.z += s.vz;
+        s.life -= 0.012;
+
+        
+        const x1 = s.x * cy - s.z * sy;
+        const z1 = s.x * sy + s.z * cy;
+        const y1 = s.y * cp - z1 * sp;
+        const z2 = s.y * sp + z1 * cp;
+
+    
+        const k = 400 / (400 + z2);
+        ctx.fillStyle = `hsla(${s.hue},100%,60%,${s.life})`;
+        ctx.fillRect(s.cx + x1 * k, s.cy + y1 * k, 2 * k + 1, 2 * k + 1);
+        return s.life > 0;
+      });
+
+      requestAnimationFrame(frame);
+    }
+    frame();
   </script>
 </body>
