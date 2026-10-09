@@ -12,6 +12,7 @@
     let sparks = [];
     let yaw = 0, pitch = 0.3;
     let down = 0, moved = 0;
+    let finale = 0;    
 
     onresize = () => {
       W = c.width = innerWidth;
@@ -42,27 +43,30 @@
     }
 
     
-    function crackle() {
-      if (!live) return;
-      const n = audio.sampleRate / 2;
-      const buf = audio.createBuffer(1, n, audio.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let i = 0; i < n; i++) {
-        d[i] = Math.random() < 0.03 ? (Math.random() * 2 - 1) * (1 - i / n) : 0;
-      }
-      const src = audio.createBufferSource();
-      const g = audio.createGain();
-      src.buffer = buf;
-      g.gain.value = 0.4;
-      src.connect(g).connect(audio.destination);
-      src.start();
+    let noise; 
+function crackle() {
+  if (!live) return;
+  if (!noise) {
+    const n = audio.sampleRate / 2;
+    noise = audio.createBuffer(1, n, audio.sampleRate);
+    const d = noise.getChannelData(0);
+    for (let i = 0; i < n; i++) {
+      d[i] = Math.random() < 0.03 ? (Math.random() * 2 - 1) * (1 - i / n) : 0;
     }
+  }
+  const src = audio.createBufferSource();
+  const g = audio.createGain();
+  src.buffer = noise;
+  g.gain.value = 0.4;
+  src.connect(g).connect(audio.destination);
+  src.start();
+}
 
     function launch(x, y) {
-      rockets.push({ x, y: H, targetY: y });
-      tone("sawtooth", 300, 1200, 0.9, 0.03); // whistle
-    }
-
+  if (rockets.length > 20) return;   
+  rockets.push({ x, y: H, targetY: y });
+  tone("sawtooth", 300, 1200, 0.9, 0.03);
+}
     onpointerdown = () => {
       wake();
       down = 1;
@@ -82,19 +86,18 @@
     };
 
   
-    onkeydown = e => {
-      if (e.code == "Space") {
-        wake();
-        for (let i = 0; i < 8; i++) {
-          setTimeout(() => launch(Math.random() * W, Math.random() * H * 0.5), i * 150);
-        }
-      }
-    };
+   onkeydown = e => {
+  if (e.code == "Space" && !e.repeat && !finale) {
+    finale = 1;
+    setTimeout(() => (finale = 0), 2000); 
+    wake();
+    for (let i = 0; i < 8; i++) {
+      setTimeout(() => launch(Math.random() * W, Math.random() * H * 0.5), i * 150);
+    }
+  }
+};
 
     
-    setInterval(() => {
-      if (Date.now() - last > 3000) launch(Math.random() * W, Math.random() * H * 0.5);
-    }, 1200);
 
     function explode(cx, cy) {
       const hue = Math.random() * 360;
@@ -129,7 +132,7 @@
 
       if (!live) {
         ctx.fillStyle = "white";
-        ctx.fillText("click to launch, drag to spin, space for a finale", 20, 30);
+        ctx.fillText("click to launch, Also try space bar and dragging", 20, 30);
       }
 
       rockets = rockets.filter(r => {
