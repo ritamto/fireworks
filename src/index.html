@@ -7,7 +7,7 @@
     const ctx = c.getContext("2d");
     let W, H, audio;
     let live = 0;               
-    let last = 0;               // time of the last interaction
+    let last = 0;    
     let rockets = [];
     let sparks = [];
     let yaw = 0, pitch = 0.3;
@@ -21,11 +21,7 @@
     onresize();
 
    
-    function wake() {
-      live = 1;
-      audio ||= new AudioContext();
-      last = Date.now();
-    }
+  
 
     function tone(type, a, b, dur, vol) {
       if (!live) return;
